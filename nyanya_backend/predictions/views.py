@@ -4,7 +4,8 @@ Dashboard Prediction Views for Tomato Market Mbeya
 
 from datetime import datetime, timedelta
 from django.db.models import Count, Avg
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .models import Prediction
@@ -13,6 +14,7 @@ from market_data.models import MarketData
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def current_week_prediction(request):
     """Current week's tomato demand prediction"""
     
@@ -46,6 +48,7 @@ def current_week_prediction(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def dashboard_cards(request):
     """Data for the 4 dashboard metric cards"""
     
@@ -111,6 +114,7 @@ def dashboard_cards(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def chart_data(request):
     """Historical data for dashboard charts"""
     
@@ -137,6 +141,7 @@ def chart_data(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def simulate_weeks(request):
     """Interactive simulation data for week-by-week playback"""
     

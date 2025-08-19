@@ -5,6 +5,10 @@ Tomato Model Loader for Colab-Generated Files
 import os
 import pickle
 import numpy as np
+import warnings
+
+# Suppress sklearn warnings for cleaner output
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 
 
 class TomatoModelLoader:
@@ -84,7 +88,6 @@ class TomatoModelLoader:
             market_day_int = 1 if market_day else 0
             school_open_int = 1 if school_open else 0
             disease_alert_int = 1 if disease_alert == 'Presence' else 0
-            
             # Feature order: Rainfall_mm, Temperature_C, Market_Day, School_Open, 
             #                Disease_Alert, Last_Week_Demand, Month, Year
             features = np.array([[
@@ -98,7 +101,15 @@ class TomatoModelLoader:
                 2024
             ]])
             
-            return features
+            # Create DataFrame with proper feature names to avoid sklearn warning
+            import pandas as pd
+            feature_names = [
+                'Rainfall_mm', 'Temperature_C', 'Market_Day', 'School_Open',
+                'Disease_Alert', 'Last_Week_Demand', 'Month', 'Year'
+            ]
+            features_df = pd.DataFrame(features, columns=feature_names)
+            
+            return features_df
             
         except Exception as e:
             raise ValueError(f"Feature encoding failed: {str(e)}")

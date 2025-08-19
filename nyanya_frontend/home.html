@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tomato demand forecasting in Mbeya</title>
+  <meta name="description" content="A clean, responsive landing page inspired by log-ai.dev" />
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --elev: #111522;
+      --muted: #9aa3b2;
+      --text: #e7ecf3;
+      --primary: #6aa9ff;
+      --primary-600: #5a98ef;
+      --accent: #6ef3c5;
+      --ring: rgba(106, 169, 255, 0.35);
+      --radius: 16px;
+      --maxw: 1200px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 80% -10%, rgba(106,169,255,0.15), transparent 60%),
+                  radial-gradient(900px 500px at 20% 0%, rgba(110,243,197,0.08), transparent 50%),
+                  var(--bg);
+      line-height: 1.5;
+    }
+ 
+
+    a { color: inherit; text-decoration: none; }
+    .container { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+
+    /* Navbar */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: saturate(140%) blur(8px);
+      background: linear-gradient(to bottom, rgba(11,13,18,0.85), rgba(11,13,18,0.55));
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .brand { display: flex; gap: 10px; align-items: center; font-weight: 700; letter-spacing: 0.3px; }
+    .brand .logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--primary), var(--accent)); box-shadow: 0 0 0 2px rgba(255,255,255,0.06) inset; display: grid; place-items: center; font-size: 14px; font-weight: 900; color: #0b0d12; }
+
+    .nav-links { display: none; gap: 20px; align-items: center; }
+    .nav-links a { color: var(--muted); font-weight: 500; }
+    .nav-links a:hover { color: var(--text); }
+    .cta { padding: 10px 14px; border-radius: 999px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #0b0d12; font-weight: 700; box-shadow: 0 8px 24px rgba(106, 169, 255, 0.25); }
+
+    .menu-btn { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
+
+    /* Mobile menu */
+    .mobile-menu { display: none; border-top: 1px solid rgba(255,255,255,0.06); background: rgba(11,13,18,0.9); }
+    .mobile-menu a { display: block; padding: 14px 20px; color: var(--muted); }
+    .mobile-menu a:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+    /* Hero */
+    .hero { padding: 96px 0 56px; position: relative; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); color: var(--muted); background: rgba(255,255,255,0.03); font-size: 12px; }
+    .hero h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.05; margin: 14px 0 16px; letter-spacing: -0.02em; }
+    .hero p { font-size: clamp(16px, 2vw, 20px); color: var(--muted); max-width: 70ch; }
+    .hero-cta { margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn { padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: #121622; color: var(--text); font-weight: 600; }
+    .btn:hover { border-color: rgba(255,255,255,0.18); box-shadow: 0 0 0 4px var(--ring); }
+    .btn.primary { background: linear-gradient(135deg, var(--primary), var(--accent)); color: #0b0d12; border: none; }
+
+    /* Pill features */
+    .pills { margin-top: 36px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .pill { padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); color: var(--muted); background: rgba(255,255,255,0.03); font-size: 13px; }
+
+    /* Mission cards */
+    .section { padding: 56px 0; }
+    .section h2 { font-size: clamp(24px, 3.5vw, 36px); margin: 0 0 16px; letter-spacing: -0.02em; }
+    .section p.lead { color: var(--muted); max-width: 70ch; }
+
+    .grid { display: grid; gap: 16px; }
+    .cards { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius); padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    .card h3 { margin: 0 0 6px; font-size: 18px; }
+    .card p { margin: 0; color: var(--muted); }
+
+    /* Subject board */
+    .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tile { position: relative; overflow: hidden; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: #0e1220; padding: 16px; min-height: 120px; }
+    .tile h4 { margin: 0; }
+    .badge { position: absolute; top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--muted); }
+
+    /* Feature list */
+    .feature-list { display: grid; gap: 12px; }
+    .feature { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #0e1220; border: 1px solid rgba(255,255,255,0.06); }
+    .feature-icon { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--primary), var(--accent)); display: grid; place-items: center; color: #0b0d12; font-weight: 900; }
+
+    /* CTA band */
+    .cta-band { margin: 40px 0; padding: 28px; border-radius: var(--radius); background: linear-gradient(90deg, rgba(106,169,255,0.15), rgba(110,243,197,0.12)); border: 1px solid rgba(255,255,255,0.12); display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+    /* Footer */
+    footer { margin-top: 60px; padding: 32px 0; border-top: 1px solid rgba(255,255,255,0.08); color: var(--muted); }
+    .foot-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+    .foot-col h5 { margin: 0 0 10px; color: var(--text); }
+    .foot-links a { display: block; margin: 6px 0; color: var(--muted); }
+    .copyright { margin-top: 20px; font-size: 14px; }
+
+    /* Responsive */
+    @media (min-width: 720px) {
+      .nav-links { display: flex; }
+      .menu-btn { display: none; }
+      .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .feature-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .foot-grid { grid-template-columns: 2fr 1fr 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="nav" aria-label="Main">
+    <div class="container nav-inner">
+      <a class="brand" href="#">
+        <div class="logo" style="font-size: 3vh;">🍅</div>
+        <span>Log-style</span>
+      </a>
+      <div class="nav-links" role="menubar">
+        <a href="#mission" role="menuitem">Mission</a>
+        <a href="#programs" role="menuitem">Programs</a>
+        <a href="#platform" role="menuitem">Platform</a>
+        <a href="#blog" role="menuitem">Blog</a>
+        <a class="cta" href="http://localhost:8501/"> Get Started</a>
+      </div>
+      <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu">
+        <!-- hamburger -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div id="mobileMenu" class="mobile-menu" role="menu">
+      <a href="#mission">Mission</a>
+      <a href="#programs">Programs</a>
+      <a href="#platform">Platform</a>
+      <a href="#blog">Blog</a>
+      <a href="#contact">Get Started</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+   <header class="hero container" style="background-image: url('a3.jpg');background-size: cover;"> 
+    <span class="eyebrow">✨ Accessible AI Learning</span>
+    <h1>Tomato demand forecasting in Mbeya.</h1>
+    <p style="color: black;">	Get future demand of Tomato in Mbeya for Reduces food waste and financial loss from poor planning. This is your time to succeed in business</p>
+    <div class="hero-cta">
+      <a class="btn primary" href="#platform">Explore the Platform</a>
+      <a class="btn" href="#contact">Join the Community</a>
+    </div>
+    <div class="pills">
+      <span class="pill">current demands</span>
+      <span class="pill">last week demands</span>
+      <span class="pill">Advicce</span>
+      <span class="pill">Graph</span>
+    </div>
+  </header>
+
+  <!-- MISSION / CARDS -->
+  <section id="mission" class="section container" style="background-image: url('a.jpg');">
+    <h2>Our Mission</h2>
+    <p class="lead">Reduces Tomato waste and financial loss from poor planning.Tommorrow is new
+</p>
+
+    <div class="grid cards" style="margin-top:18px;">
+      <article class="card">
+        <h3>Accessibilty</h3>
+        <p>This app is Accessible through internet and offline service.</p>
+      </article>
+      <article class="card">
+        <h3>Make more profit</h3>
+        <p>Use machine learning model which can help to do prediction correct and esily.</p>
+      </article>
+      <article class="card">
+        <h3>Tools for Learners</h3>
+        <p>Use visualized data through graphs and model for prediction.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- SUBJECT BOARD -->
+  <section id="programs" class="section container">
+    <h2>Advice & prediction</h2>
+    <p class="lead">Pick what do you want to understand and learn from the following through graph and advice</p>
+
+    <div class="grid board" style="margin-top:18px;">
+      <div class="tile">
+        <div class="badge">parts</div>
+        <h4>what you shall see</h4>
+        <p class="muted">Advace from market history.</p>
+        <div class="pills" style="margin-top:10px;">
+          <span class="pill">from history</span>
+          <span class="pill">current demand</span>
+          <span class="pill">future demand</span>
+          <!-- <span class="pill">Telophase</span> -->
+        </div>
+      </div>
+      <div class="tile">
+        <div class="badge">Graph</div>
+        <h4>Data visualization</h4>
+        <p class="muted">Visualized 30 years ago data.</p>
+      </div>
+      <div class="tile">
+        <div class="badge">prediction</div>
+        <h4>Get prediction for future</h4>
+        <p class="muted">This especially for current week.</p>
+      </div>
+      <div class="tile">
+        <div class="badge">General</div>
+        <h4>Click getstarted</h4>
+        <p class="muted">A study assistant that adapts to you.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLATFORM FEATURES -->
+  <section id="platform" class="section container">
+    <h2>Supportive website for extra Education</h2>
+    <p class="lead">Adaptive sessions, instant concept clarifications and progress tracking — designed for real understanding.</p>
+
+    <div class="feature-list" style="margin-top:18px;">
+      <div class="feature">
+        <div class="feature-icon">A</div>
+        <div>
+          <strong>Adaptive lessons</strong>
+          <div class="muted">Content adjusts in real‑time to your pace and needs.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <div>
+          <strong>Instant clarity</strong>
+          <div class="muted">Ask follow‑ups anywhere and get focused explanations.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📈</div>
+        <div>
+          <strong>Analytics</strong>
+          <div class="muted">Track progress and identify knowledge gaps quickly.</div>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🧩</div>
+        <div>
+          <strong>Multi‑level content</strong>
+          <div class="muted">Not only tomatoes but other business education.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-band">
+      <div>
+        <strong>Ready to try it?</strong>
+        <div class="muted">Start a guided tour or jump straight into a course.</div>
+      </div>
+      <div class="hero-cta" style="margin:0;">
+        <a class="btn primary" href="#">Start Now</a>
+        <a class="btn" href="#">View Docs</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- BLOG / PLACEHOLDER -->
+  <section id="blog" class="section container">
+    <h2>From the Blog</h2>
+    <div class="grid cards" style="margin-top:18px;">
+      <article class="card">
+        <h3>How to design interactive lessons</h3>
+        <p>Principles for visuals, pacing and formative checks.</p>
+      </article>
+      <article class="card">
+        <h3>Choosing datasets for education</h3>
+        <p>Make projects meaningful and ethically sourced.</p>
+      </article>
+      <article class="card">
+        <h3>Measuring learning outcomes</h3>
+        <p>Analytics that actually help learners progress.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- CONTACT / FOOTER -->
+  <section id="contact" class="section container">
+    <h2>Get in touch</h2>
+    <p class="lead">Have a question, want to collaborate, or ready to learn? Send us a note.</p>
+    <form id="contactForm" class="grid" style="gap:12px; grid-template-columns: 1fr; max-width:720px; margin-top:10px;">
+      <input aria-label="Name" required name="name" placeholder="Your name" style="padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:#0f1422; color:var(--text)" />
+      <input aria-label="Email" required type="email" name="email" placeholder="Email address" style="padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:#0f1422; color:var(--text)" />
+      <textarea aria-label="Message" required name="message" rows="4" placeholder="Your message" style="padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background:#0f1422; color:var(--text)"></textarea>
+      <button class="btn primary" type="submit" style="width:max-content">Send</button>
+      <div id="formMsg" class="muted" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <footer>
+    <div class="container foot-grid">
+      <div class="foot-col">
+        <div class="brand"><div class="logo">🍅</div><span>Log-style</span></div>
+        <p class="muted">Learning tools and programs to help anyone build with AI.</p>
+      </div>
+      <div class="foot-col">
+        <h5>Group</h5>
+        <div class="foot-links">
+          <a href="#mission">About</a>
+          <a href="#programs">Programs</a>
+          <a href="#platform">Platform</a>
+        </div>
+      </div>
+      <div class="foot-col">
+        <h5>Resources</h5>
+        <div class="foot-links">
+          <a href="#blog">Blog</a>
+          <a href="#">Docs</a>
+          <a href="#contact">Support</a>
+        </div>
+      </div>
+      <div class="foot-col">
+        <h5>Social</h5>
+        <div class="foot-links">
+          <a href="#">Twitter</a>
+          <a href="#">Instagram</a>
+          <a href="#">LinkedIn</a>
+        </div>
+      </div>
+    </div>
+    <div class="container copyright">© <span id="year"></span> Group project. All rights reserved.</div>
+  </footer>
+
+  <script>
+    // Mobile menu
+    const btn = document.getElementById('menuBtn');
+    const menu = document.getElementById('mobileMenu');
+    btn.addEventListener('click', () => {
+      const open = menu.style.display === 'block';
+      menu.style.display = open ? 'none' : 'block';
+      btn.setAttribute('aria-expanded', String(!open));
+    });
+
+    // Smooth scroll for internal links
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const id = a.getAttribute('href');
+        if (id.length > 1) {
+          e.preventDefault();
+          document.querySelector(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (menu.style.display === 'block') menu.style.display = 'none';
+        }
+      });
+    });
+
+    // Simple contact form handler (demo only)
+    const form = document.getElementById('contactForm');
+    const msg = document.getElementById('formMsg');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      msg.textContent = `Thanks, ${data.name}! We'll get back to you at ${data.email}.`;
+      form.reset();
+    });
+
+    // Year in footer
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
+ 

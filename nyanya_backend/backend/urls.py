@@ -34,14 +34,15 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    # Django admin
     path('admin/', admin.site.urls),
     
     # API Documentation
     path('', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('api/docs.json/', schema_view.without_ui(cache_timeout=0), name='schema-swagger-ui'),
     
-    # API endpoints (simplified)
+    # endpoints
+    path('api/auth/', include('authentication.urls')),
     path('api/data/', include('market_data.urls')),
     path('api/predictions/', include('predictions.urls')),
 ]
