@@ -192,23 +192,21 @@ def show_landing_page():
         st.rerun()
 
 def authenticate_user(username, password):
-    """Login user and get token"""
+    """Authenticate user with the backend API"""
     try:
-        url = f"{API_BASE_URL}/auth/login/"
-        data = {
-            "username": username,
-            "password": password
-        }
-        
-        response = requests.post(url, json=data)
+        response = requests.post(
+            f"{API_BASE_URL}/auth/login/",
+            data={'username': username, 'password': password}
+        )
         if response.status_code == 200:
-            result = response.json()
-            return result['token'], result['user'], None
-        else:
-            error_data = response.json()
-            return None, None, error_data
-    except Exception as e:
-        return None, None, {"error": str(e)}
+            data = response.json()
+            if data.get('token'):  # Backend returns 'token' not 'access'
+                st.session_state.authenticated = True
+                st.session_state.user_info = data.get('user', {})
+                return True
+        return False
+    except:
+        return False
 
 def register_user(username, email, password, first_name="", last_name=""):
     """Register new user"""
@@ -305,12 +303,9 @@ def show_auth_page():
             login_btn = st.form_submit_button("Login", use_container_width=True)
             
             if login_btn and username and password:
-                token, user, error = authenticate_user(username, password)
-                if token:
-                    st.session_state.token = token
-                    st.session_state.user = user
+                if authenticate_user(username, password):
                     st.session_state.page = 'dashboard'
-                    st.success(f"Welcome, {user['username']}!")
+                    st.success("Login successful!")
                     st.rerun()
                 else:
                     st.error("Invalid credentials")
@@ -339,320 +334,329 @@ def show_auth_page():
                     else:
                         st.error("Registration failed")
 
+def fetch_agricultural_tips():
+    """Fetch agricultural tips from backend API"""
+    try:
+        response = requests.get(f"{API_BASE_URL}/predictions/agricultural-tips/")
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Error fetching agricultural tips: {e}")
+        # Fallback tips
+        return {
+            'tips': [
+                {'icon': '💡', 'text': 'Plant tomatoes during dry season for better yields'},
+                {'icon': '🌱', 'text': 'Use organic fertilizers to improve soil health'},
+                {'icon': '💧', 'text': 'Water early morning to reduce disease risk'},
+                {'icon': '📈', 'text': 'Monitor market prices weekly for best selling time'}
+            ]
+        }
+
 def fetch_dashboard_data():
     """Fetch all dashboard data from APIs"""
     try:
-        # Fetch KPI cards data
         cards_response = requests.get(f"{API_BASE_URL}/predictions/dashboard-cards/")
         cards_data = cards_response.json() if cards_response.status_code == 200 else {}
         
-        # Fetch current week prediction
         current_response = requests.get(f"{API_BASE_URL}/predictions/current-week/")
         current_data = current_response.json() if current_response.status_code == 200 else {}
         
-        # Fetch chart data
         chart_response = requests.get(f"{API_BASE_URL}/predictions/chart-data/")
         chart_data = chart_response.json() if chart_response.status_code == 200 else {}
         
-        # Fetch simulation data
-        simulation_response = requests.get(f"{API_BASE_URL}/predictions/simulate/?start=1&end=20&year=2025")
+        # Get more frames for better animation
+        simulation_response = requests.get(f"{API_BASE_URL}/predictions/simulate/?start=1&end=50&year=2025")
         simulation_data = simulation_response.json() if simulation_response.status_code == 200 else {}
+        
+        status_response = requests.get(f"{API_BASE_URL}/predictions/status-cards/")
+        status_data = status_response.json() if status_response.status_code == 200 else {}
+        
+        # New APIs for charts
+        market_insights_response = requests.get(f"{API_BASE_URL}/predictions/market-insights/")
+        market_insights_data = market_insights_response.json() if market_insights_response.status_code == 200 else {}
+        
+        business_insights_response = requests.get(f"{API_BASE_URL}/predictions/business-insights/")
+        business_insights_data = business_insights_response.json() if business_insights_response.status_code == 200 else {}
+        
+        # Fetch agricultural tips
+        tips_response = requests.get(f"{API_BASE_URL}/predictions/agricultural-tips/")
+        tips_data = tips_response.json() if tips_response.status_code == 200 else {}
         
         return {
             'cards': cards_data,
             'current': current_data,
             'chart': chart_data,
-            'simulation': simulation_data
+            'simulation': simulation_data,
+            'status': status_data,
+            'market_insights': market_insights_data,
+            'business_insights': business_insights_data,
+            'tips': tips_data
         }
     except Exception as e:
         st.error(f"Error fetching data: {str(e)}")
-        return {'cards': {}, 'current': {}, 'chart': {}, 'simulation': {}}
+        return {'cards': {}, 'current': {}, 'chart': {}, 'simulation': {}, 'status': {}, 'market_insights': {}, 'business_insights': {}, 'tips': {}}
 
-def create_demand_trend_chart(chart_data):
-    """Create line chart for demand trends using native Streamlit"""
-    if not chart_data or 'trend_data' not in chart_data:
-        # Fallback data
-        weeks = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8']
-        demand_values = [65, 70, 68, 75, 72, 78, 73, 80]
+def create_small_donut_chart(data):
+    """Create a small donut chart for cards"""
+    if not data or 'data' not in data:
+        # Fallback with dashboard-themed colors
+        chart_data = [
+            {'label': 'High', 'value': 30, 'color': '#6aa9ff'},
+            {'label': 'Medium', 'value': 50, 'color': '#6ef3c5'},
+            {'label': 'Low', 'value': 20, 'color': '#a855f7'}
+        ]
+        # Find dominant value for center
+        max_item = max(chart_data, key=lambda x: x['value'])
+        center_text = f"{max_item['value']}%"
+        center_label = max_item['label']
     else:
-        trend_data = chart_data['trend_data']
-        weeks = [item['week'] for item in trend_data]
-        demand_values = [item['demand_value'] * 25 for item in trend_data]  # Scale to percentage
+        chart_data = data['data']
+        # Find the dominant segment for center display
+        max_item = max(chart_data, key=lambda x: x['value'])
+        center_text = f"{max_item['value']}%"
+        center_label = max_item['label']
     
-    # Create DataFrame for Streamlit chart
-    chart_df = pd.DataFrame({
-        'Week': weeks,
-        'Demand %': demand_values,
-        'Forecast %': [v + 5 for v in demand_values]
-    })
+    labels = [item['label'] for item in chart_data]
+    values = [item['value'] for item in chart_data]
+    colors = [item['color'] for item in chart_data]
     
-    return chart_df
-
-def create_animation_chart(simulation_data):
-    """Create ULTRA SMOOTH animated bubble chart with MANY MANY small bubbles - keep original colors"""
-    if not simulation_data or 'frames' not in simulation_data:
-        # Fallback data - MANY MANY traders with VERY different behaviors and sizes
-        trader_names = [f"Trader_{i+1}" for i in range(150)]  # 150 traders - MORE!
-        weeks = list(range(1, 26))  # 25 frames for ULTRA SMOOTH animation!
-        
-        df_data = []
-        for week in weeks:
-            for i, trader in enumerate(trader_names):
-                # VERY different size categories - mostly small!
-                if i < 90:  # 60% tiny traders
-                    base_size = 3 + (i % 6)  # Very tiny: 3-8
-                    trader_type = 'Small Trader'
-                elif i < 127:  # 25% medium traders  
-                    base_size = 9 + (i % 8)  # Medium: 9-16
-                    trader_type = 'Medium Trader'
-                elif i < 142:  # 10% large traders
-                    base_size = 17 + (i % 10)  # Large: 17-26
-                    trader_type = 'Large Trader'
-                else:  # 5% huge traders
-                    base_size = 27 + (i % 15)  # Huge: 27-41
-                    trader_type = 'Major Trader'
-                
-                # COMPLETELY different SMOOTH movement patterns for each trader
-                movement_type = i % 15  # 15 different movement patterns
-                
-                # Create ULTRA SMOOTH interpolated movements
-                progress = (week - 1) / 24  # Smooth 0 to 1 progress over 25 frames
-                
-                if movement_type == 0:  # Smooth random movers
-                    base_conf = 30 + (i * 0.7)
-                    base_demand = 1.2 + (i % 5) * 0.4
-                    # Smooth sine wave variation
-                    confidence = base_conf + 15 * ((week / 5) % 1) + (i % 13 - 6) * 2
-                    demand = base_demand + 0.5 * ((week / 3) % 1) + (i % 7 - 3) * 0.05
-                elif movement_type == 1:  # Smooth trend followers
-                    confidence = 40 + (progress * 40) + (i % 9 - 4) * 1.5
-                    demand = 1.5 + (progress * 1.2) + (i % 3) * 0.3
-                elif movement_type == 2:  # Smooth volatile traders
-                    volatility = ((week * 0.8) % 4 - 2) / 2  # Smooth oscillation
-                    confidence = 50 + volatility * 25 + (i % 17 - 8) * 2
-                    demand = 2.0 + volatility * 0.6 + (i % 5) * 0.1
-                elif movement_type == 3:  # Smooth conservative
-                    confidence = 60 + (i % 11) * 1.2 + (progress * 10)
-                    demand = 1.8 + (i % 7) * 0.08 + (progress * 0.2)
-                elif movement_type == 4:  # Smooth contrarian
-                    confidence = 45 + (1 - progress) * 20 + (i % 19) * 1.5
-                    demand = 2.5 - (progress * 0.8) + (i % 5) * 0.15
-                elif movement_type == 5:  # Smooth cyclical
-                    cycle = (week * 0.6) % 6 - 3  # Smooth cycle
-                    confidence = 55 + cycle * 8 + (i % 11) * 1
-                    demand = 2.0 + cycle * 0.2 + (i % 3) * 0.1
-                elif movement_type == 6:  # Smooth momentum
-                    momentum = progress ** 1.5
-                    confidence = 35 + momentum * 30 + (i % 7) * 2
-                    demand = 1.3 + momentum * 0.8 + (i % 4) * 0.2
-                elif movement_type == 7:  # Smooth seasonal
-                    seasonal = ((week * 0.4) % 8 - 4) / 4  # Smooth season
-                    confidence = 50 + seasonal * 15 + (i % 13) * 1.2
-                    demand = 1.7 + seasonal * 0.3 + (i % 5) * 0.1
-                elif movement_type == 8:  # Smooth news-driven
-                    news_cycle = ((week * 0.7) % 6 - 3) / 3
-                    confidence = 40 + news_cycle * 20 + (i % 23 - 11) * 1.5
-                    demand = 1.9 + news_cycle * 0.4 + (i % 6 - 3) * 0.08
-                elif movement_type == 9:  # Smooth wave pattern
-                    wave = (week * 0.5) % 10 - 5  # Smooth wave
-                    confidence = 45 + wave * 6 + (i % 17) * 1.8
-                    demand = 2.1 + wave * 0.15 + (i % 7) * 0.12
-                elif movement_type == 10:  # Smooth lag traders
-                    lag_progress = max(0, progress - 0.2)  # Delayed start
-                    confidence = 35 + lag_progress * 35 + (i % 31) * 1.3
-                    demand = 1.4 + lag_progress * 0.9 + (i % 9 - 4) * 0.06
-                elif movement_type == 11:  # Smooth jump traders
-                    jump = 1 if (week % 8 > 4) else 0  # Smooth transitions
-                    confidence = 45 + jump * 20 + (progress * 15) + (i % 13) * 1.5
-                    demand = 1.8 + jump * 0.4 + (progress * 0.3) + (i % 5 - 2) * 0.08
-                elif movement_type == 12:  # Ultra smooth operators
-                    confidence = 50 + (progress * 25) + (i % 37) * 0.8
-                    demand = 1.6 + (progress * 0.6) + (i % 11 - 5) * 0.04
-                elif movement_type == 13:  # Smooth chaos traders
-                    chaos = ((week * 1.1) % 12 - 6) / 6  # Controlled chaos
-                    confidence = 35 + chaos * 18 + (i % 29) * 1.4
-                    demand = 1.3 + chaos * 0.35 + (i % 13 - 6) * 0.07
-                else:  # Smooth ultra volatile
-                    ultra_vol = ((week * 0.9) % 8 - 4) / 4
-                    confidence = 30 + ultra_vol * 25 + (i % 41) * 1.1
-                    demand = 1.1 + ultra_vol * 0.7 + (i % 17 - 8) * 0.09
-                
-                # Smooth size variation to bubble
-                size_variation = base_size + (progress * (i % 5 - 2) * 1.5) + ((week * 0.3) % 2 - 1)
-                final_size = max(2, min(45, size_variation))
-                
-                df_data.append({
-                    'week': week,
-                    'trader': trader,
-                    'demand_level': max(0.5, min(3.5, demand)),
-                    'confidence': max(15, min(95, confidence)),
-                    'volume': final_size,
-                    'category': trader_type,
-                    'profit': 200 + (i * 12) + (confidence * 15),
-                    'movement_type': movement_type
-                })
-        
-        df = pd.DataFrame(df_data)
-    else:
-        # Use REAL simulation data - CREATE MANY MANY traders with EXTREME variety and ULTRA SMOOTH movement
-        frames = simulation_data['frames']
-        trader_names = [f"Farm_{i+1}" for i in range(180)]  # 180 traders - EVEN MORE!
-        
-        # Create interpolated frames for ULTRA SMOOTH animation
-        total_frames = max(20, len(frames) * 3)  # Triple the frames for smoothness
-        
-        # Map demand levels to numeric values
-        demand_map = {'Low': 1, 'Medium': 2, 'High': 3}
-        
-        df_data = []
-        for frame_idx in range(total_frames):
-            # Interpolate between real frames
-            real_frame_idx = min(len(frames) - 1, int((frame_idx / total_frames) * len(frames)))
-            frame = frames[real_frame_idx]
-            
-            week = frame_idx + 1  # Use interpolated week
-            base_confidence = frame.get('confidence', 0.85) * 100
-            base_demand = demand_map.get(frame.get('predicted_demand', 'Medium'), 2)
-            is_match = frame.get('match', True)
-            
-            # Create 180 VERY different traders with EXTREME variety and SMOOTH movement
-            for i, trader in enumerate(trader_names):
-                # Size distribution - MOSTLY TINY
-                if i < 108:  # 60% micro traders
-                    base_size = 2 + (i % 5)  # 2-6 (micro)
-                    trader_type = 'Micro Farm'
-                elif i < 144:  # 20% tiny traders
-                    base_size = 7 + (i % 6)  # 7-12 (tiny)
-                    trader_type = 'Small Farm'
-                elif i < 162:  # 10% small traders
-                    base_size = 13 + (i % 8)  # 13-20 (small)
-                    trader_type = 'Medium Farm'
-                elif i < 171:  # 5% medium traders
-                    base_size = 21 + (i % 10)  # 21-30 (medium)
-                    trader_type = 'Large Farm'
-                elif i < 177:  # 3% large traders
-                    base_size = 31 + (i % 12)  # 31-42 (large)
-                    trader_type = 'Major Farm'
-                else:  # 2% huge traders
-                    base_size = 43 + (i % 15)  # 43-57 (huge)
-                    trader_type = 'Corporate Farm'
-                
-                # EXTREME behavior variety - 20 different SMOOTH patterns
-                behavior = i % 20
-                progress = frame_idx / max(1, total_frames - 1)  # Smooth 0-1 progress
-                
-                # Each behavior responds VERY differently with SMOOTH interpolation
-                if behavior == 0:  # Micro volatile with smooth waves
-                    conf_mult = 0.5 + 0.3 * ((frame_idx * 0.4) % 4 - 2) / 2 + (i % 23 * 0.02)
-                    demand_shift = 0.2 * ((frame_idx * 0.3) % 6 - 3) / 3 + (i % 17 - 8) * 0.02
-                elif behavior == 1:  # Smooth trend amplifiers
-                    conf_mult = 1.2 + (progress * 0.4) + 0.2 * ((frame_idx * 0.2) % 3 - 1.5) / 1.5 + (i % 11 * 0.03)
-                    demand_shift = (progress * 0.6) + 0.1 * ((frame_idx * 0.25) % 4 - 2) / 2 + (i % 7 - 3) * 0.05
-                elif behavior == 2:  # Smooth market rebels
-                    rebel_wave = ((frame_idx * 0.35) % 8 - 4) / 4
-                    conf_mult = 1.5 - (base_confidence * 0.008) + rebel_wave * 0.3 + (i % 19 * 0.015)
-                    demand_shift = -(progress * 0.4) + rebel_wave * 0.2 + (i % 9) * 0.12
-                elif behavior == 3:  # Smooth noise traders
-                    noise = ((frame_idx * 0.6 + i * 0.3) % 10 - 5) / 5
-                    conf_mult = 0.8 + noise * 0.4 + (i % 31 * 0.018)
-                    demand_shift = noise * 0.25 + (i % 13 - 6) * 0.03
-                elif behavior == 4:  # Smooth momentum followers
-                    momentum = progress ** 1.2
-                    momentum_wave = ((frame_idx * 0.28) % 5 - 2.5) / 2.5
-                    conf_mult = 0.7 + momentum * 0.6 + momentum_wave * 0.2 + (i % 13 * 0.025)
-                    demand_shift = momentum * 0.8 + momentum_wave * 0.15 + (i % 5 - 2) * 0.06
-                elif behavior == 5:  # Smooth mean reverters
-                    revert_cycle = ((frame_idx * 0.22) % 12 - 6) / 6
-                    conf_mult = 1.3 - (progress * 0.3) + revert_cycle * 0.25 + (i % 21 * 0.02)
-                    demand_shift = -(progress * 0.4) + revert_cycle * 0.18 + (i % 11 - 5) * 0.04
-                elif behavior == 6:  # Smooth herders
-                    herd_strength = 0.6 + 0.4 * ((frame_idx * 0.15) % 6 - 3) / 3
-                    conf_mult = 0.9 + (8 if is_match else -6) * 0.01 * herd_strength + (i % 7 * 0.03)
-                    demand_shift = (4 if is_match else -2) * 0.1 * herd_strength + (i % 3 - 1) * 0.08
-                # Continue with more smooth behaviors...
-                else:  # Default smooth pattern
-                    smooth_var = ((frame_idx * 0.45 + i * 0.2) % 16 - 8) / 8
-                    conf_mult = 0.85 + smooth_var * 0.35 + (i % 37 * 0.02)
-                    demand_shift = smooth_var * 0.3 + (i % 19 - 9) * 0.025
-                
-                # Apply SMOOTH transformations
-                final_confidence = base_confidence * conf_mult + ((i % 43 - 21) * 0.8)
-                final_demand = base_demand + demand_shift + ((i % 29 - 14) * 0.03)
-                
-                # SMOOTH size variation based on performance and progress
-                size_var = base_size * (1 + (final_confidence - 50) * 0.003) + (progress * (i % 7 - 3) * 0.5)
-                final_size = max(1.5, min(60, size_var))
-                
-                df_data.append({
-                    'week': week,
-                    'trader': trader,
-                    'demand_level': max(0.3, min(3.7, final_demand)),
-                    'confidence': max(5, min(98, final_confidence)),
-                    'volume': final_size,
-                    'category': trader_type,
-                    'profit': 100 + (i * 8) + (final_confidence * 12),
-                    'movement_type': behavior
-                })
-        
-        df = pd.DataFrame(df_data)
+    fig = go.Figure(data=[go.Pie(
+        labels=labels,
+        values=values,
+        hole=0.6,
+        marker=dict(colors=colors),
+        textinfo='none',
+        hovertemplate='<b>%{label}</b><br>%{value}%<extra></extra>',
+        showlegend=False
+    )])
     
-    # Create ULTRA SMOOTH animated bubble chart with MANY MANY SMALL BUBBLES
-    fig = px.scatter(
-        df,
-        x='demand_level',
-        y='confidence',
-        size='volume',
-        color='category',
-        animation_frame='week',
-        hover_name='trader',
-        hover_data={
-            'profit': ':,',
-            'volume': ':.1f',
-            'demand_level': ':.2f',
-            'confidence': ':.1f',
-            'movement_type': True
-        },
-        size_max=25,  # Smaller max size for more bubbles
-        range_x=[0.2, 3.8],
-        range_y=[0, 100],
-        # NO TITLE - removed as requested
-        color_discrete_sequence=px.colors.qualitative.Pastel  # Keep original colors!
-    )
-    
-    # Update layout for clean appearance - NO TITLE
     fig.update_layout(
-        xaxis_title='Demand Level',
-        yaxis_title='Confidence %',
-        xaxis=dict(
-            tickmode='array',
-            tickvals=[1, 2, 3],
-            ticktext=['Low', 'Medium', 'High']
-        ),
-        showlegend=True,
-        legend=dict(
-            title="Farm Size", 
-            orientation="h", 
-            yanchor="bottom", 
-            y=1.02, 
-            xanchor="right", 
-            x=1,
-            font=dict(size=8)  # Even smaller legend
-        ),
-        height=350,
-        margin=dict(l=0, r=0, t=15, b=0),  # Minimal top margin
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)'
+        height=120,
+        width=120,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor='rgba(255,255,255,0)',
+        plot_bgcolor='rgba(255,255,255,0)',
+        annotations=[dict(
+            text=f"<b style='font-size:16px; font-weight:900; color:#1f2937;'>{center_text}</b><br><span style='font-size:11px; font-weight:700; color:#6b7280;'>{center_label}</span>",
+            x=0.5, y=0.5,
+            showarrow=False
+        )]
     )
-    
-    # ULTRA SMOOTH animation settings - KEY FOR SMOOTHNESS!
-    if hasattr(fig.layout, 'updatemenus') and fig.layout.updatemenus:
-        fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 400  # Faster frames
-        fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 600  # Longer smooth transitions
-        fig.layout.updatemenus[0].buttons[0].args[1]['transition']['easing'] = 'cubic-in-out'  # Smooth easing curve
     
     return fig
 
-def create_simulation_data(simulation_data, current_frame=0):
+def create_mini_bar_chart(insights_data):
+    """Create a mini bar chart for business insights"""
+    if not insights_data:
+        weeks = ['W1', 'W2', 'W3', 'W4']
+        profits = [300, 450, 520, 480]
+    else:
+        # Create simple profit trend
+        potential = insights_data.get('current_profit_potential', 'Medium')
+        if potential == 'High':
+            profits = [420, 480, 550, 620]
+        elif potential == 'Medium':
+            profits = [320, 380, 450, 420]
+        else:
+            profits = [200, 250, 280, 260]
+        weeks = ['W1', 'W2', 'W3', 'W4']
+    
+    fig = go.Figure(data=[go.Bar(
+        x=weeks,
+        y=profits,
+        marker_color='#6aa9ff',
+        hovertemplate='<b>%{x}</b><br>%{y}K Tsh<extra></extra>',
+        text=[f'{p}K' for p in profits],
+        textposition='outside',
+        textfont=dict(size=12, color='#1f2937', family="Arial"),  # Increased size and made darker
+        width=0.4  # Make bars thinner
+    )])
+    
+    fig.update_layout(
+        height=100,
+        margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor='rgba(255,255,255,0)',
+        plot_bgcolor='rgba(255,255,255,0)',
+        xaxis=dict(
+            showgrid=False,
+            showticklabels=True,
+            title=None,
+            tickfont=dict(size=9, color='#6b7280')
+        ),
+        yaxis=dict(
+            showgrid=False,
+            showticklabels=False,
+            title=None
+        ),
+        showlegend=False
+    )
+    
+    return fig
+
+def create_market_insights_chart(simulation_data):
+    """Create a dynamic animated market chart using real simulation data"""
+    if not simulation_data or 'frames' not in simulation_data:
+        return None
+    
+    frames = simulation_data['frames']
+    if not frames:
+        return None
+    
+    # Extract real data with better mapping
+    weeks = [frame['week'] for frame in frames]
+    
+    # Create more realistic mapping that shows actual variation
+    demand_map = {'LOW': 25, 'MEDIUM': 50, 'HIGH': 75}
+    
+    # Process data to create meaningful variation
+    demand_values = []
+    actual_values = []
+    
+    for i, frame in enumerate(frames):
+        # Base values from demand levels
+        predicted_base = demand_map.get(frame.get('predicted_demand', 'MEDIUM'), 50)
+        actual_base = demand_map.get(frame.get('actual_demand', 'MEDIUM'), 50)
+        confidence = frame.get('confidence', 0.5)
+        
+        # Add realistic market variation based on confidence
+        # High confidence = less variation, Low confidence = more variation
+        confidence_factor = (1 - confidence) * 8  # Up to 8 point variation
+        
+        # Add slight trend and natural market fluctuation
+        week_factor = (i % 7) * 2 - 6  # Weekly cycle effect
+        trend_factor = i * 0.3  # Slight upward trend
+        
+        # Calculate final values with realistic bounds
+        predicted_final = predicted_base + confidence_factor + week_factor * 0.5 + trend_factor
+        actual_final = actual_base + confidence_factor * 1.2 + week_factor + trend_factor * 0.8
+        
+        # Keep values in realistic range (20-80%)
+        demand_values.append(max(20, min(80, predicted_final)))
+        actual_values.append(max(20, min(80, actual_final)))
+    
+    # Create base figure with static data
+    fig = go.Figure()
+    
+    # Add initial traces (first frame)
+    fig.add_trace(go.Scatter(
+        x=weeks[:1],
+        y=actual_values[:1],
+        mode='lines+markers',
+        name='Actual Demand',
+        line=dict(color='#6aa9ff', width=3),
+        marker=dict(size=8, color='#6aa9ff'),
+        hovertemplate='<b>Week %{x}</b><br>Actual: %{y:.1f}%<extra></extra>'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=weeks[:1],
+        y=demand_values[:1],
+        mode='lines+markers',
+        name='Predicted Demand',
+        line=dict(color='#ff6b35', width=2, dash='dash'),  # Bright orange for better visibility
+        marker=dict(size=6, color='#ff6b35'),
+        hovertemplate='<b>Week %{x}</b><br>Predicted: %{y:.1f}%<extra></extra>'
+    ))
+    
+    # Create animation frames
+    animation_frames = []
+    for i in range(1, len(weeks) + 1):
+        frame = go.Frame(
+            data=[
+                go.Scatter(
+                    x=weeks[:i],
+                    y=actual_values[:i],
+                    mode='lines+markers',
+                    line=dict(color='#6aa9ff', width=3),
+                    marker=dict(size=8, color='#6aa9ff'),
+                    name='Actual Demand'
+                ),
+                go.Scatter(
+                    x=weeks[:i],
+                    y=demand_values[:i],
+                    mode='lines+markers',
+                    line=dict(color='#ff6b35', width=2, dash='dash'),  # Bright orange
+                    marker=dict(size=6, color='#ff6b35'),
+                    name='Predicted Demand'
+                )
+            ],
+            name=str(i)
+        )
+        animation_frames.append(frame)
+    
+    fig.frames = animation_frames
+    
+    # Layout optimized for card height and data range
+    fig.update_layout(
+        height=320,  # Match the full card height to align with donut chart level
+        margin=dict(l=25, r=25, t=45, b=35),  # Adjust margins for full utilization
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            title="Week",
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.2)',
+            tickfont=dict(size=10, color='white'),
+            title_font=dict(size=12, color='white'),
+            range=[1, max(weeks)]
+        ),
+        yaxis=dict(
+            title="Demand Level (%)",
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.2)',
+            tickfont=dict(size=10, color='white'),
+            title_font=dict(size=12, color='white'),
+            range=[15, 85]  # Optimized range for our data (20-80%) with some padding
+        ),
+        showlegend=True,
+        legend=dict(
+            x=0.02,
+            y=0.98,
+            bgcolor='rgba(0,0,0,0.3)',
+            font=dict(color='white', size=10)
+        ),
+        font=dict(family="Arial", size=11, color='white'),
+        title=dict(
+            text="Live Market Trends",
+            font=dict(color='white', size=14),
+            x=0.5,
+            y=0.95
+        ),
+        # Animation controls
+        updatemenus=[{
+            'type': 'buttons',
+            'showactive': False,
+            'buttons': [
+                {
+                    'label': '▶ Play',
+                    'method': 'animate',
+                    'args': [None, {
+                        'frame': {'duration': 600, 'redraw': True},  # Slightly faster animation
+                        'fromcurrent': True,
+                        'transition': {'duration': 400, 'easing': 'cubic-in-out'}
+                    }]
+                },
+                {
+                    'label': '⏸ Pause',
+                    'method': 'animate',
+                    'args': [[None], {
+                        'frame': {'duration': 0, 'redraw': False},
+                        'mode': 'immediate',
+                        'transition': {'duration': 0}
+                    }]
+                }
+            ],
+            'direction': 'left',
+            'pad': {'r': 10, 't': 10},
+            'x': 0.02,
+            'y': 0.02,
+            'bgcolor': 'rgba(106, 169, 255, 0.2)',
+            'bordercolor': 'rgba(106, 169, 255, 0.5)',
+            'font': {'color': 'white', 'size': 10}
+        }]
+    )
+    
+    return fig
     """Process simulation data for charts"""
     if not simulation_data or 'frames' not in simulation_data:
         return {
@@ -729,7 +733,7 @@ def show_dashboard():
         text-transform: uppercase;
     }
     
-    /* KPI Cards - smaller and clean */
+    /* KPI Cards */
     .kpi-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -783,13 +787,7 @@ def show_dashboard():
         margin: 0 20px 20px 20px;
     }
     
-    /* Status cards */
-    .status-cards {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-    }
-    
+    /* Status cards - adjust for Streamlit columns */
     .status-card {
         background: white;
         padding: 15px;
@@ -798,6 +796,7 @@ def show_dashboard():
         display: flex;
         align-items: center;
         gap: 12px;
+        margin-bottom: 15px;
     }
     
     .status-icon {
@@ -826,12 +825,13 @@ def show_dashboard():
         color: #6b7280;
     }
     
-    /* Chart container */
+    /* Chart containers - adjust for Streamlit columns */
     .chart-container {
         background: white;
-        padding: 20px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 0;
+        margin-bottom: 15px;
     }
     
     .chart-title {
@@ -841,6 +841,10 @@ def show_dashboard():
         margin-bottom: 15px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        background: white;
+        padding: 15px 20px 0 20px;
+        border-radius: 8px 8px 0 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     /* Tips container */
@@ -849,6 +853,8 @@ def show_dashboard():
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         overflow: hidden;
+        height: fit-content;
+        margin-bottom: 0;
     }
     
     .tips-header {
@@ -886,6 +892,7 @@ def show_dashboard():
         align-items: center;
         justify-content: center;
         font-size: 14px;
+        flex-shrink: 0;
     }
     
     .tip-text {
@@ -903,13 +910,14 @@ def show_dashboard():
         margin: 0 20px;
     }
     
-    /* Download section */
+    /* Download/Updates card - adjust for Streamlit columns */
     .download-card {
         background: white;
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         text-align: center;
+        margin-bottom: 15px;
     }
     
     .download-circle {
@@ -932,14 +940,17 @@ def show_dashboard():
         text-transform: uppercase;
     }
     
-    /* Simulation placeholder */
-    .simulation-container {
+    /* Business insights container - ensure white background */
+    .business-insights-container {
         background: white;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         overflow: hidden;
+        margin-bottom: 0;
+        height: fit-content;
     }
     
+    /* Business insights header - adjust for Streamlit columns */
     .simulation-header {
         background: #1f2937;
         color: white;
@@ -948,6 +959,12 @@ def show_dashboard():
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        margin-bottom: 0;
+    }
+    
+    .business-insights-content {
+        background: white;
+        padding: 15px 20px 20px 20px;
     }
     
     .simulation-content {
@@ -995,6 +1012,9 @@ def show_dashboard():
     # Breadcrumb
     st.markdown('<div class="breadcrumb">HOME > DASHBOARD</div>', unsafe_allow_html=True)
     
+    # Add spacing after breadcrumb
+    st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
+    
     # Logout button (small, in corner)
     col1, col2 = st.columns([10, 1])
     with col2:
@@ -1004,10 +1024,8 @@ def show_dashboard():
             st.session_state.page = 'landing'
             st.rerun()
     
-    # Fetch data
     data = fetch_dashboard_data()
     
-    # Extract real data for KPI cards
     cards_data = data.get('cards', {})
     current_data = data.get('current', {})
     
@@ -1058,75 +1076,156 @@ def show_dashboard():
     </div>
     """, unsafe_allow_html=True)
     
-    # Middle Section
-    st.markdown("""
-    <div class="middle-section">
-        <div class="status-cards">
-            <div class="status-card">
-                <div class="status-icon health">♥</div>
-                <div class="status-text">
-                    <h4>HEALTH CARE</h4>
-                    <p>Current status</p>
-                </div>
-            </div>
-            <div class="status-card">
-                <div class="status-icon weather">☁</div>
-                <div class="status-text">
-                    <h4>WEATHER UPDATES</h4>
-                    <p>Current conditions</p>
-                </div>
-            </div>
-            <div class="download-card">
-                <div class="download-circle">↓</div>
-                <div class="download-text">UPDATES</div>
-            </div>
-        </div>
-        <div class="chart-container">
-            <div class="chart-title">DEMAND & FORECAST PERCENTAGE</div>
-            <div style="padding: 40px; text-align: center; color: #6b7280;">
-                Chart area - will be integrated later
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Add spacing after KPI cards
+    st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
     
-    # Bottom Section - Tips and Simulation side by side
-    st.markdown("""
-    <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; margin: 0 20px;">
+    status_data = data.get('status', {})
+    weather_data = status_data.get('weather', {})
+    health_data = status_data.get('health', {})
+    
+    # Middle Section - Use real data with proper titles
+    weather_status = weather_data.get('status', 'Weather Conditions')
+    weather_details = weather_data.get('details', 'Weather data unavailable')
+    health_status = health_data.get('status', 'Crop Health Status')  
+    health_details = health_data.get('details', 'Disease monitoring data unavailable')
+    
+    # Better titles based on actual data
+    if health_data.get('disease_alert') == 'Presence':
+        health_title = "DISEASE ALERT"
+    elif health_data.get('disease_alert') == 'Absence':
+        health_title = "CROP HEALTH"
+    else:
+        health_title = "HEALTH STATUS"
+    
+    if weather_data.get('temperature'):
+        weather_title = "WEATHER CONDITIONS"
+    else:
+        weather_title = "WEATHER DATA"
+    
+    # Middle Section using Streamlit native layout (avoids CSS conflicts)
+    col1, col2 = st.columns([1, 2])
+    
+    # Left column - Status cards and Updates
+    with col1:
+        # Health Status Card
+        st.markdown(f"""
+        <div class="status-card">
+            <div class="status-icon health">♥</div>
+            <div class="status-text">
+                <h4>{health_title}</h4>
+                <p>{health_details}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Weather Status Card  
+        st.markdown(f"""
+        <div class="status-card">
+            <div class="status-icon weather">☁</div>
+            <div class="status-text">
+                <h4>{weather_title}</h4>
+                <p>{weather_details}</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Demand Distribution Card with donut chart
+        st.markdown("""
+        <div class="download-card">
+            <div class="download-text" style="margin-bottom: 10px;">DEMAND DISTRIBUTION</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Add donut chart in Demand Distribution card
+        market_insights_data = data.get('market_insights', {})
+        if market_insights_data:
+            donut_fig = create_small_donut_chart(market_insights_data)
+            st.plotly_chart(donut_fig, use_container_width=True, key="market_donut")
+    
+    # Right column - Market Insights  
+    with col2:
+        st.markdown("""
+        <div class="chart-container">
+            <div class="chart-title">MARKET INSIGHTS</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Add the dynamic market insights chart
+        market_chart = create_market_insights_chart(data.get('simulation', {}))
+        if market_chart:
+            st.plotly_chart(market_chart, use_container_width=True, key="market_insights_chart")
+    
+    # Add spacing after middle section
+    st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
+    
+    # Bottom Section using Streamlit native layout  
+    col1, col2 = st.columns([1, 2])
+    
+    # Left column - Tips
+    with col1:
+        tips_data = data.get('tips', {})
+        tips_list = tips_data.get('tips', [
+            {'icon': '💡', 'text': 'Plant tomatoes during dry season for better yields'},
+            {'icon': '🌱', 'text': 'Use organic fertilizers to improve soil health'},
+            {'icon': '💧', 'text': 'Water early morning to reduce disease risk'},
+            {'icon': '📈', 'text': 'Monitor market prices weekly for best selling time'}
+        ])
+        
+        # Tips container header
+        st.markdown("""
         <div class="tips-container">
             <div class="tips-header">TIPS OF THE WEEK</div>
             <div class="tips-content">
+        """, unsafe_allow_html=True)
+        
+        # Create tips items with proper HTML structure
+        for tip in tips_list[:4]:  # Display up to 4 tips
+            st.markdown(f"""
                 <div class="tip-item">
-                    <div class="tip-icon">💡</div>
-                    <div class="tip-text">Plant tomatoes during dry season for better yields</div>
+                    <div class="tip-icon">{tip.get('icon', '💡')}</div>
+                    <div class="tip-text">{tip.get('text', '')}</div>
                 </div>
-                <div class="tip-item">
-                    <div class="tip-icon">🌱</div>
-                    <div class="tip-text">Use organic fertilizers to improve soil health</div>
-                </div>
-                <div class="tip-item">
-                    <div class="tip-icon">💧</div>
-                    <div class="tip-text">Water early morning to reduce disease risk</div>
-                </div>
-                <div class="tip-item">
-                    <div class="tip-icon">📈</div>
-                    <div class="tip-text">Monitor market prices weekly for best selling time</div>
-                </div>
+            """, unsafe_allow_html=True)
+        
+        # Close tips container
+        st.markdown("""
             </div>
         </div>
-        <div class="simulation-container">
-            <div class="simulation-header">MARKET SIMULATION</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
-    # Create and display the animated bubble chart INSIDE the simulation container
-    simulation_fig = create_animation_chart(data.get('simulation', {}))
-    st.plotly_chart(
-        simulation_fig,
-        use_container_width=True,
-        key="simulation_chart"
-    )
+    # Right column - Business Insights
+    with col2:
+        st.markdown("""
+        <div class="business-insights-container">
+            <div class="simulation-header">BUSINESS INSIGHTS</div>
+            <div class="business-insights-content">
+        """, unsafe_allow_html=True)
+        
+        # Business insights content
+        business_insights_data = data.get('business_insights', {})
+        if business_insights_data:
+            # Display key metrics
+            col2a, col2b = st.columns(2)
+            with col2a:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 5px;">
+                    <h4 style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Profit Potential</h4>
+                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">{business_insights_data.get('current_profit_potential', 'Medium')}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with col2b:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 5px;">
+                    <h4 style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase;">Est. Revenue</h4>
+                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1f2937;">{business_insights_data.get('weekly_revenue_estimate', '450,000')} Tsh</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Add mini bar chart
+            bar_fig = create_mini_bar_chart(business_insights_data)
+            st.plotly_chart(bar_fig, use_container_width=True, key="business_bar")
+        
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
 def show_full_dashboard():
     """Redirect to main dashboard - no longer needed"""

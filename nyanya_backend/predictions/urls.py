@@ -13,4 +13,10 @@ urlpatterns = [
     path('dashboard-cards/', views.dashboard_cards, name='dashboard-cards'),
     path('chart-data/', views.chart_data, name='chart-data'),
     path('simulate/', views.simulate_weeks, name='simulate-weeks'),
+    path('status-cards/', views.status_cards, name='status-cards'),
+    # New chart APIs
+    path('market-insights/', views.market_insights_chart, name='market-insights'),
+    path('business-insights/', views.business_insights_data, name='business-insights'),
+    # Tips API
+    path('agricultural-tips/', views.agricultural_tips, name='agricultural-tips'),
 ]
