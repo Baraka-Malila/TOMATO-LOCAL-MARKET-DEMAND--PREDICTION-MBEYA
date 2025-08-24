@@ -1,0 +1,5 @@
+# Streamlit frontend requirements for Tomato Market Prediction Dashboard
+streamlit>=1.28.0
+requests>=2.31.0
+plotly>=5.17.0
+pandas>=2.1.0
