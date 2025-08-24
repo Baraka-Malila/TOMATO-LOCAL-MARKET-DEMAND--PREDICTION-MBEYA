@@ -7,6 +7,7 @@ import plotly.express as px
 import pandas as pd
 from pathlib import Path
 import time
+import os
 
 # Page configuration
 st.set_page_config(
@@ -65,7 +66,8 @@ footer {
 """, unsafe_allow_html=True)
 
 # API Configuration
-API_BASE_URL = "http://localhost:8000/api"
+# API Configuration - Use environment variable or default to localhost
+API_BASE_URL = os.getenv("API_BASE_URL", "https://nyanya-backend-mbeya-7bcc42b64c52.herokuapp.com/api")
 
 # Initialize session state
 if 'page' not in st.session_state:
